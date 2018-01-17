@@ -1,0 +1,152 @@
+#this is the communication setup between TIM101 serial number 65864311 with a motor only connected to channel 1
+#the series of  ###### indicates a new cell
+
+import sys
+import ctypes
+import All_Dlls as alldll
+import numpy as np    
+import time
+
+serialnum = 65864311
+
+mydll = ctypes.WinDLL(r'Thorlabs.MotionControl.TCube.InertialMotor.dll')
+i = ctypes.c_char_p(bytes(str(serialnum),'utf-8'))
+
+#check to see if cube is connected to computer
+
+buildlist = mydll.TLI_BuildDeviceList()
+listsize = mydll.TLI_GetDeviceListSize()
+initialize = mydll.TIM_Open(i)
+connection = mydll.TIM_CheckConnection(i)
+enable = mydll.TIM_Enable(i)
+
+if initialize != 0:
+    print('device not initialized')
+else:
+    print('connection successful')
+if [0, 1, 0, 1, 0] == [buildlist, listsize, initialize, connection, enable]:
+    print('number of devices connected: %s ' %(listsize))
+else:
+    if connection == 0:
+        print('error connecting')
+    
+    #buildlist: 0 if successful
+    #listsize: number of devices connected if successful
+    #initialize: 0 if successful
+    #connection: 1 if successful
+
+#confirm serial number 65844311
+
+charstring = ctypes.c_char * 250
+serialNos = charstring()
+deviceID= ctypes.c_int(65)
+mydll.TLI_GetDeviceListByTypeExt(ctypes.byref(serialNos), 250, deviceID);
+a = serialNos.value
+
+if str(a) == str("b'%s,'"%serialnum):
+    print('serial confirmed to be %s' %serialnum)
+else:
+    print('no serial connection')
+#########
+
+#to set current position
+i = ctypes.c_char_p(bytes('65864311','utf-8'))
+setposition = 0
+setpos = mydll.TIM_SetPosition(i,ctypes.c_ushort(1),ctypes.c_int32(setposition))
+if setpos == 0:
+    print('motor is set to position %s' %setposition)
+else:
+    print('failed to set to position %s' %setposition)
+#########
+a = 100 #any variables can be a, b, or c. can also include more if I want
+b = 200
+c = 300
+x = np.array([[a], [b], [c]])
+#print(x.shape)
+#print(np.zeros(len(x)))
+for j in range(x.shape[0]):
+    moveabsolute = x[j]
+    #print(moveabsolute)
+    mov = mydll.TIM_MoveAbsolute(i,ctypes.c_ushort(1),ctypes.c_int32(moveabsolute))
+    time.sleep(0)
+    if mov == 0:
+        print('moved to %s' %str(moveabsolute))
+    else:
+        print('err')
+    time.sleep(1)
+currentpos = a+b+c
+print('current position = %s' %str(c))
+    #setpos = sum(x[::j+1])
+    #print(setpos)
+#########
+
+#move from current position to an absolute position. positive for forward (turns knob right), negative for reverse (left)
+
+i = ctypes.c_char_p(bytes('65864311','utf-8'))
+moveabsolute = 300
+moveabs = mydll.TIM_MoveAbsolute(i,ctypes.c_ushort(1),ctypes.c_int32(moveabsolute))
+if moveabs == 0:
+    print('current position = %s' % str(moveabsolute))
+else:
+    print('move command failed')
+#returns 0 if successful
+
+#########
+pos = mydll.TIM_GetCurrentPosition(i,ctypes.c_ushort(1))
+
+if pos == 0:
+    print('device was initially set to position 0')
+else:
+    print('motor at position %s' %pos)
+
+#########
+#set Jog parameters
+#I don't think I will want to use Jog for the GA because I will need to see the specific position the motor is at.
+#here is a series of three moves where the motor is jogged at the specified acceleration, direction, and for a specified amount of time
+
+jogdirection = 1 #1 for forward, 2 for reverse
+chan = 1
+jmode = 1 #1 for continuous, 2 for step
+#when you choose step, must specify step size and rate and acceleration
+jss = 1 #jog step size
+jsr = 10 #jog step rate
+
+jtime = .25 #seconds
+jaccel = 300
+
+setparams = mydll.TIM_SetJogParameters(i,ctypes.c_ushort(chan),ctypes.c_uint16(jmode),ctypes.c_int32(jss),ctypes.c_int32(jsr),ctypes.c_int32(jaccel))
+movejog = mydll.TIM_MoveJog(i,ctypes.c_ushort(chan),ctypes.c_byte(jogdirection))
+time.sleep(jtime)
+movestop = mydll.TIM_MoveStop(i,ctypes.c_ushort(chan))
+time.sleep(.1)
+
+jtime2 = .25 #seconds
+jaccel2 = 500
+
+setparams = mydll.TIM_SetJogParameters(i,ctypes.c_ushort(chan),ctypes.c_uint16(jmode),ctypes.c_int32(jss),ctypes.c_int32(jsr),ctypes.c_int32(jaccel2))
+movejog = mydll.TIM_MoveJog(i,ctypes.c_ushort(chan),ctypes.c_byte(jogdirection))
+time.sleep(jtime2)
+movestop = mydll.TIM_MoveStop(i,ctypes.c_ushort(chan))
+time.sleep(.1)
+
+jtime3 = .25 #seconds
+jaccel3 = 400
+
+setparams = mydll.TIM_SetJogParameters(i,ctypes.c_ushort(chan),ctypes.c_uint16(jmode),ctypes.c_int32(jss),ctypes.c_int32(jsr),ctypes.c_int32(jaccel3))
+movejog = mydll.TIM_MoveJog(i,ctypes.c_ushort(chan),ctypes.c_byte(jogdirection))
+time.sleep(jtime3)
+movestop = mydll.TIM_MoveStop(i,ctypes.c_ushort(chan))
+time.sleep(.1)
+
+########
+#should probably do this after every project using it.
+#disable, disconnect, close
+disable = mydll.TIM_Disable(i)
+disconnect = mydll.TIM_Disable(i)
+close = mydll.TIM_Close(i)
+if [0, 0] == [disable, disconnect]:
+    print ('disconnected successfully')
+else:
+    print ('disconnect error')
+    
+########

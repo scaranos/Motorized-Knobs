@@ -1,0 +1,167 @@
+import logging
+logger = logging.getLogger(__name__)
+
+import traceback, os
+from math import isnan
+import ctypes
+import sys
+import ctypes
+import numpy as np    
+import time
+
+serialnum1 = 65864311
+#serialnum2 = 65864312
+
+# I'm not sure what the serial number list will look like when I connect two cubes so I will work on this part when the 
+#  cube becomes available for use
+
+mydll = ctypes.WinDLL(r'Thorlabs.MotionControl.TCube.InertialMotor.dll')
+i = ctypes.c_char_p(bytes(str(serialnum1),'utf-8'))
+#j = ctypes.c_char_p(bytes(str(serialnum2),'utf-8'))
+
+buildlist = mydll.TLI_BuildDeviceList()
+listsize = mydll.TLI_GetDeviceListSize()
+initialize = mydll.TIM_Open(i)
+connection = mydll.TIM_CheckConnection(i)
+enable = mydll.TIM_Enable(i)
+
+if initialize != 0:
+    print('device not initialized')
+else:
+    print('connection successful')
+if [0, 1, 0, 1, 0] == [buildlist, listsize, initialize, connection, enable]:
+    #WILL NEED TO CHANGE LISTSIZE NUMBER WHEN I CONNECT TWO CUBES
+    print('number of devices connected: %s ' %(listsize))
+else:
+    if connection == 0:
+        print('error connecting')
+
+charstring = ctypes.c_char * 250
+serialNos = charstring()
+deviceID= ctypes.c_int(65)
+mydll.TLI_GetDeviceListByTypeExt(ctypes.byref(serialNos), 250, deviceID);
+a = serialNos.value
+if str(a) == str("b''"):
+    print('no serial connection')
+else:
+    print(a)
+
+#if str(a) == str("b'%s,'"%serialnum1):
+#    print('serial confirmed to be %s' %serialnum1)
+#else:
+#    print('no serial connection')
+#to set current position to 0 (calibration) ONLY DO THIS ONCE IN CODE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+setposition = 0
+
+setpos1 = mydll.TIM_SetPosition(i,ctypes.c_ushort(1),ctypes.c_int32(setposition))
+setpos2 = mydll.TIM_SetPosition(i,ctypes.c_ushort(2),ctypes.c_int32(setposition))
+setpos3 = mydll.TIM_SetPosition(i,ctypes.c_ushort(3),ctypes.c_int32(setposition))
+setpos4 = mydll.TIM_SetPosition(i,ctypes.c_ushort(4),ctypes.c_int32(setposition))
+#setpos5 = mydll.TIM_SetPosition(j,ctypes.c_ushort(1),ctypes.c_int32(setposition))
+
+#########
+if setpos1 == setpos2 == setpos3 == setpos4  == 0:
+    print('motor is set to position %s' %setposition)
+else:
+    print('failed to set to position %s' %setposition)
+    
+#not working entirely correctly (not remembering location to do next iteration) because it's not in for loop form yet
+#########
+class Optimization():
+    photon_count_max = 10000
+    
+
+    #def __init__(self,method,optimize):
+        ### not sure if i need this
+        
+    def setup(self):
+        variable_units = []        
+        self.optimizationvariables = ['channel1','channel2','channel3','channel4','channel5'] 
+        self.pa = 15
+        # change the standard deviation so that as the photon count increases the stdev decreases.
+        #should it just be some fraction/function of pb?
+       
+        if 0 < self.pa < 500:
+            self.stdev = 200
+        elif 500 < pa < 1000:
+            self.stdev = 100
+        elif 1000 < pa < 2000:
+            self.stdev = 50
+        elif 2000 < pa < 4000:
+            self.stdev = 10
+        else:
+            self.stdev = 5
+        
+        self.xi = np.empty(len(self.optimizationvariables))
+        
+        self.photon_count_max = 10000
+        
+        #having problem with setup because I want to use the value of pc but also have it be influenced by subsequent runs of pb
+          
+    def genetic(self):
+        pa = self.pa
+        stdev = self.stdev
+        photon_count_max = self.photon_count_max
+        xi = self.xi
+        pa = 1000
+        
+        #if I make pa the result['dm_eval'][1][1] , will it remember what it was before the motors started moving? I want
+        # to scan, pause scan, get data, log in that data, continue with moving the motors, see new count, and compare the 
+        #logged old count to the new count.
+        
+        if pa < photon_count_max:
+            #before the motors move
+            p1 =  0  #position of channel 1 
+            p2 =  0  
+            p3 =  0 
+            p4 =  0  
+            p5 =  0
+            before = [p1,p2,p3,p4,p5]
+
+
+            p1b = np.random.normal(p1, stdev, xi.shape)
+            p1a = int(round(p1b[0]))
+            p2a = int(round(p1b[1]))
+            p3a = int(round(p1b[2]))
+            p4a = int(round(p1b[3]))
+            p5a = int(round(p1b[4]))
+            
+            positions = [p1a,p2a,p3a,p4a,p5a]
+
+            mydll.TIM_MoveAbsolute(i,ctypes.c_ushort(1),ctypes.c_int32(p1a))
+            #mydll.TIM_MoveAbsolute(i,ctypes.c_ushort(2),ctypes.c_int32(p2a))
+            #mydll.TIM_MoveAbsolute(i,ctypes.c_ushort(3),ctypes.c_int32(p3a))
+            #mydll.TIM_MoveAbsolute(i,ctypes.c_ushort(4),ctypes.c_int32(p4a))
+            #mydll.TIM_MoveAbsolute(j,ctypes.c_ushort(1),ctypes.c_int32(p5a))
+            time.sleep(1)
+            
+            #result = getData()
+            #pauseScan()  # pause
+            #pb = result['dm_eval'][1]  ### count = result['dm_eval'][1][1]
+            pb = 100
+
+            if pb < pa:
+                mydll.TIM_MoveAbsolute(i,ctypes.c_ushort(1),ctypes.c_int32(p1))
+                #mydll.TIM_MoveAbsolute(i,ctypes.c_ushort(2),ctypes.c_int32(p2))
+                #mydll.TIM_MoveAbsolute(i,ctypes.c_ushort(3),ctypes.c_int32(p3))
+                #mydll.TIM_MoveAbsolute(i,ctypes.c_ushort(4),ctypes.c_int32(p4))
+                #mydll.TIM_MoveAbsolute(j,ctypes.c_ushort(1),ctypes.c_int32(p5))
+                print('current motor positions are %s after moving %s and coming back'%(before, positions))
+
+            else:
+                p1 = p1a
+                #p2 = p2a
+                #p3 = p3a
+                #p4 = p4a
+                #p5 = p5a
+                pa = pb
+                print('the current positions are %s' %positions)
+                
+            print('the current best photon count is %s' %pa)
+        else:
+            print('photon count has reached %s'%photon_count_max)
+           
+a = Optimization()
+a.setup()
+a.genetic()
+# calibrate the understep of each motor and account for that 

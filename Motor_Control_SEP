@@ -56,7 +56,7 @@ if MotorControlEnabled:
                 if value <= self.minPos and value >= self.maxPos:
                     if isinstance(value, float):
                         value = int(round(value))
-                    self.mydll.TIM_MoveAbsolute(self.i, c_ushort(channel),ctypes.c_int32(value)) #or shoulf the inputs just be (i, 1, 257) or something    
+                    self.mydll.TIM_MoveAbsolute(self.i, ctypes.c_ushort(channel),ctypes.c_int32(value)) #or shoulf the inputs just be (i, 1, 257) or something    
                 else:
                     logger.error('position for {0} outside of range'.format(value))       
             else:

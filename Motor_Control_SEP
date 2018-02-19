@@ -24,7 +24,7 @@ if MotorControlEnabled:
             logger.info("trying to open '{0}'".format(instrument)) 
             serialnum1 = ######
             #serialnum2 = ####
-            self.i = ctypes.c_char_p(bytes(str(serialnum1),'utf-8'))
+            self.i = ctypes.c_char_p(bytes(str(serialnum1),'utf-8'))   ### the sandia code seems to be having a problem with ctypes
             #self.j = ctypes.c_char_p(bytes(str(serialnum2),'utf-8'))
             self.minPos = ####
             self.maxPos = ####

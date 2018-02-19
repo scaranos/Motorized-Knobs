@@ -1,0 +1,68 @@
+# Motor Control to be within the Standard External Parameter (SEP) in the Sandia software
+MotorControlEnabled = project.isEnabled('hardware','MotorControl')
+
+if MotorControlEnabled:
+    from InertialMotors.MotorControllers import MotorControl
+    #from Folder.FileName import Class
+
+if MotorControlEnabled:
+    
+    class InertialMotorControl(ExternalParameterBase):
+        classname = "Inertial Motor Control"
+        _outputChannels = OrderedDictionary([('chan1', ""), ('chan2', ""), ('chan3', ""), ('chan4', ""), ('chan5', "")])
+        #in empty quotes would be units but I have none
+        mydll = ctypes.WinDLL(r'Thorlabs.MotionControl.TCube.InertialMotor.dll')
+        #don't need output lookup
+        
+        
+        def __init__(self, name, config, globalDict, instrument='InertialMotor'):
+            #same as in her parenth
+            # logger is how you record messages. will need.
+            logger = logging.getLogger(__name__)
+            super().__init__(self, name, config, globalDict)
+            #gets called when you open the sandia software
+            logger.info("trying to open '{0}'".format(instrument)) 
+            serialnum1 = ######
+            #serialnum2 = ####
+            self.i = ctypes.c_char_p(bytes(str(serialnum1),'utf-8'))
+            #self.j = ctypes.c_char_p(bytes(str(serialnum2),'utf-8'))
+            self.minPos = ####
+            self.maxPos = ####
+            
+            self.buildlist = self.mydll.TLI_BuildDeviceList()
+            self.listsize = self.mydll.TLI_GetDeviceListSize()
+            self.initialize = self.mydll.TIM_Open(self.i)
+            self.connection = self.mydll.TIM_CheckConnection(self.i)
+            self.enable = self.mydll.TIM_Enable(self.i)
+
+            #instead of printing a string if there is an error, have it return an error code.
+            if initialize == 0:
+                logger.info('Device {0} is initialized'.format(int(serialnum1)))
+                #print('device initialized')        
+                lists = [self.buildlist, self.listsize, self.initialize, self.connection, self.enable]
+                if lists == [0, 1, 0, 1, 0]:
+                    logger.info('Device {0} is available'.format(int(serialnum1)))
+                     #WILL NEED TO CHANGE LISTSIZE NUMBER WHEN I CONNECT TWO CUBES
+                else:
+                    logger.warning('error connecting device {0}'.format(int(serialnum1)))                    
+            else:
+                logger.warning('Device {0} initialization uncessful'.format(int(serialnum1)))
+                
+                
+        def setValue(self, channel, value):
+            logger = logging.getLogger(__name__) 
+
+            if channel >= 1 and channel <= 5:
+                if value <= self.minPos and value >= self.maxPos:
+                    if isinstance(value, float):
+                        value = int(round(value))
+                    self.mydll.TIM_MoveAbsolute(self.i, c_ushort(channel),ctypes.c_int32(value)) #or shoulf the inputs just be (i, 1, 257) or something    
+                else:
+                    logger.error('position for {0} outside of range'.format(value))       
+            else:
+                logger.error('channel {0} unrecognized'.format(channel))
+               
+
+
+        def close(self):
+            self.mydll.TIM_Disconnect(self.i)
